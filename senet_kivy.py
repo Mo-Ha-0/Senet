@@ -328,47 +328,52 @@ class SenetApp(App):
     def build(self):
         # Set window size to simulate mobile device
         Window.size = (800, 600)
-        
+
         # Main layout
         main_layout = BoxLayout(orientation='vertical', padding=10, spacing=10)
-        
+
         # Title
         title = Label(text='Senet Game', size_hint_y=None, height=50, font_size=30)
         main_layout.add_widget(title)
-        
+
         # Message label
-        self.message_label = Label(text='Welcome to Senet! Choose your player.', 
+        self.message_label = Label(text='Welcome to Senet! Choose your player.',
                                   size_hint_y=None, height=50, font_size=18)
         main_layout.add_widget(self.message_label)
-        
+
         # Board widget
         self.board_widget = SenetBoardWidget()
         self.board_widget.set_message_label(self.message_label)
         main_layout.add_widget(self.board_widget)
-        
+
         # Control buttons
         controls_layout = GridLayout(cols=2, size_hint_y=None, height=60, spacing=10)
-        
+
         # Player selection buttons
         player1_btn = Button(text='Play as Player 1 (Red)')
         player1_btn.bind(on_press=self.select_player_1)
         controls_layout.add_widget(player1_btn)
-        
+
         player2_btn = Button(text='Play as Player 2 (Blue)')
         player2_btn.bind(on_press=self.select_player_2)
         controls_layout.add_widget(player2_btn)
-        
+
         main_layout.add_widget(controls_layout)
-        
+
         # Roll button
         self.roll_btn = Button(text='ROLL DICE', size_hint_y=None, height=60)
         self.roll_btn.bind(on_press=self.roll_dice)
         self.roll_btn.disabled = True  # Disabled until player is selected
         main_layout.add_widget(self.roll_btn)
-        
+
+        # Restart button
+        restart_btn = Button(text='RESTART GAME', size_hint_y=None, height=60)
+        restart_btn.bind(on_press=self.restart_game)
+        main_layout.add_widget(restart_btn)
+
         # Initialize game
         self.init_game()
-        
+
         return main_layout
     
     def init_game(self):
@@ -378,8 +383,29 @@ class SenetApp(App):
             player_2_rocks_pos=(0, 2, 4, 6, 8, 10, 12),
             current_player=1,  # Will be updated after player selection
         )
+
+    def restart_game(self, instance):
+        # Reset the game to initial state
+        self.board_widget.game_over = False
+        self.board_widget.thinking = False
+        self.board_widget.selected_rock = None
+        self.board_widget.current_roll = None
+        self.board_widget.available_moves_list = []
+
+        # Reset to initial state
+        if hasattr(self, 'current_player_selection'):
+            # If player has already selected, reset to that state
+            if self.current_player_selection == 1:
+                self.select_player_1(instance)
+            else:
+                self.select_player_2(instance)
+        else:
+            # If no selection made yet, just reset message
+            self.message_label.text = 'Welcome to Senet! Choose your player.'
+            self.roll_btn.disabled = True
     
     def select_player_1(self, instance):
+        self.current_player_selection = 1
         self.board_widget.human_player = 1
         self.board_widget.computer_player = 2
         self.board_widget.state = GameState(
@@ -392,6 +418,7 @@ class SenetApp(App):
         self.message_label.text = "You are Player 1 (Red). Your turn. Press ROLL to play."
         
     def select_player_2(self, instance):
+        self.current_player_selection = 2
         self.board_widget.human_player = 2
         self.board_widget.computer_player = 1
         self.board_widget.state = GameState(
@@ -402,7 +429,7 @@ class SenetApp(App):
         self.board_widget.set_game_state(self.board_widget.state)
         self.roll_btn.disabled = True  # Computer goes first
         self.message_label.text = "You are Player 2 (Blue). Computer's turn..."
-        
+
         # Start computer's turn
         Clock.schedule_once(self.board_widget.computer_turn, 1.0)
         

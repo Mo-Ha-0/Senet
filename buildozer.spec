@@ -32,7 +32,7 @@ version = 0.1
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy
+requirements = python3,kivy,pygame
 
 # (str) Custom source folders for requirements
 # Sets custom source for any requirements with recipes
@@ -41,11 +41,11 @@ requirements = python3,kivy
 # (list) Garden requirements
 #garden_requirements =
 
-# (str) Presplash of the application
-#presplash.filename = %(source.dir)s/data/presplash.png
-
 # (str) Icon of the application
-#icon.filename = %(source.dir)s/data/icon.png
+icon.filename = %(source.dir)s/icon.png
+
+# (str) Presplash of the application
+presplash.filename = %(source.dir)s/presplash.png
 
 # (str) Supported orientation (one of landscape, sensorLandscape, portrait, sensorPortrait, all)
 orientation = landscape
