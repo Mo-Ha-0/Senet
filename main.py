@@ -64,8 +64,9 @@ class BoardWidget(FloatLayout):
         Clock.schedule_once(lambda dt: self.ensure_board_setup(), 0.01)
     
     def on_pos_change(self, *args):
-        if self.state and self.cell_rects:
-            self.needs_redraw = True
+        if self.state:
+            self.calculate_cells()
+            self.update_board()
     
     def ensure_board_setup(self):
         if self.state:
@@ -386,25 +387,25 @@ class BoardWidget(FloatLayout):
         if from_pos >= len(self.cell_rects):
             callback()
             return
-        
+
         self.animation_running = True
-        
+
         from_rect = self.cell_rects[from_pos]
         if to_pos < len(self.cell_rects):
             to_rect = self.cell_rects[to_pos]
-            
+
             if self.state.current_player == 1:
                 color = (0.95, 0.3, 0.15, 1)
             else:
                 color = (0.25, 0.55, 0.9, 1)
-            
+
             self.create_particles(from_rect['center_x'], from_rect['center_y'], color, 5)
-            
+
             Clock.schedule_once(lambda dt: self.create_particles(
                 to_rect['center_x'], to_rect['center_y'], (1, 1, 0.5, 1), 10
-            ), 0.3)
-        
-        Clock.schedule_once(lambda dt: self.finish_animation(callback), 0.4)
+            ), 0.1)  # Reduced from 0.3 to 0.15 seconds
+
+        Clock.schedule_once(lambda dt: self.finish_animation(callback), 0.1)  # Reduced from 0.4 to 0.2 seconds
     
     def finish_animation(self, callback):
         """Finish animation and call callback"""
@@ -474,33 +475,81 @@ class SenetApp(App):
 
         btn_player1 = Button(
             text='Play as RED vs AI',
-            size_hint=(1, 0.12),
-            background_color=(0.95, 0.3, 0.25, 1),
+            size_hint=(0.8, 0.12),
+            pos_hint={'center_x': 0.5},
+            background_normal='',  # Remove default background
+            background_color=(1, 1, 1, 0),  # Transparent background
             font_size='20sp',
             bold=True,
-            color=(1, 1, 1, 1)
+            color=(1, 1, 1, 1),
+            halign='center',
+            valign='middle'
         )
+        # Add rounded rectangle using canvas.before
+        with btn_player1.canvas.before:
+            Color(0.95, 0.3, 0.25, 1)  # Red background
+            btn_player1.rounded_rect = RoundedRectangle(
+                pos=btn_player1.pos,
+                size=btn_player1.size,
+                radius=[25]
+            )
+        # Bind the button press event
         btn_player1.bind(on_press=lambda x: self.select_player(1))
+        # Update the rounded rectangle when size/pos changes
+        btn_player1.bind(pos=lambda inst, val: setattr(inst.rounded_rect, 'pos', val))
+        btn_player1.bind(size=lambda inst, val: setattr(inst.rounded_rect, 'size', val))
 
         btn_player2 = Button(
             text='Play as BLUE vs AI',
-            size_hint=(1, 0.12),
-            background_color=(0.25, 0.55, 0.9, 1),
+            size_hint=(0.8, 0.12),
+            pos_hint={'center_x': 0.5},
+            background_normal='',  # Remove default background
+            background_color=(1, 1, 1, 0),  # Transparent background
             font_size='20sp',
             bold=True,
-            color=(1, 1, 1, 1)
+            color=(1, 1, 1, 1),
+            halign='center',
+            valign='middle'
         )
+        # Add rounded rectangle using canvas.before
+        with btn_player2.canvas.before:
+            Color(0.25, 0.55, 0.9, 1)  # Blue background
+            btn_player2.rounded_rect = RoundedRectangle(
+                pos=btn_player2.pos,
+                size=btn_player2.size,
+                radius=[25]
+            )
+        # Bind the button press event
         btn_player2.bind(on_press=lambda x: self.select_player(2))
+        # Update the rounded rectangle when size/pos changes
+        btn_player2.bind(pos=lambda inst, val: setattr(inst.rounded_rect, 'pos', val))
+        btn_player2.bind(size=lambda inst, val: setattr(inst.rounded_rect, 'size', val))
 
         btn_two_players = Button(
             text='Two Players Mode',
-            size_hint=(1, 0.12),
-            background_color=(0.1, 0.6, 0.3, 1),
+            size_hint=(0.8, 0.12),
+            pos_hint={'center_x': 0.5},
+            background_normal='',  # Remove default background
+            background_color=(1, 1, 1, 0),  # Transparent background
             font_size='20sp',
             bold=True,
-            color=(1, 1, 1, 1)
+            color=(1, 1, 1, 1),
+            halign='center',
+            valign='middle'
         )
+        # Add rounded rectangle using canvas.before
+        with btn_two_players.canvas.before:
+            Color(0.1, 0.6, 0.3, 1)  # Green background
+            btn_two_players.rounded_rect = RoundedRectangle(
+                pos=btn_two_players.pos,
+                size=btn_two_players.size,
+                radius=[25]
+            )
+        # Bind the button press event
         btn_two_players.bind(on_press=lambda x: self.start_two_player_game())
+        # Update the rounded rectangle when size/pos changes
+        btn_two_players.bind(pos=lambda inst, val: setattr(inst.rounded_rect, 'pos', val))
+        btn_two_players.bind(size=lambda inst, val: setattr(inst.rounded_rect, 'size', val))
 
         layout.add_widget(btn_player1)
         layout.add_widget(btn_player2)
@@ -554,12 +603,29 @@ class SenetApp(App):
         for name, depth, color in difficulties:
             btn = Button(
                 text=name,
-                size_hint=(1, 0.15),
-                background_color=color,
+                size_hint=(0.8, 0.15),
+                pos_hint={'center_x': 0.5},
+                background_normal='',  # Remove default background
+                background_color=(1, 1, 1, 0),  # Transparent background
                 font_size='24sp',
-                bold=True
+                bold=True,
+                color=(1, 1, 1, 1),
+                halign='center',
+                valign='middle'
             )
+            # Add rounded rectangle using canvas.before
+            with btn.canvas.before:
+                Color(*color)  # Use the specified color
+                btn.rounded_rect = RoundedRectangle(
+                    pos=btn.pos,
+                    size=btn.size,
+                    radius=[25]
+                )
+            # Bind the button press event (need to capture depth in closure)
             btn.bind(on_press=lambda x, d=depth: self.start_game(d))
+            # Update the rounded rectangle when size/pos changes
+            btn.bind(pos=lambda inst, val: setattr(inst.rounded_rect, 'pos', val))
+            btn.bind(size=lambda inst, val: setattr(inst.rounded_rect, 'size', val))
             layout.add_widget(btn)
         
         self.main_layout.add_widget(layout)
@@ -579,41 +645,109 @@ class SenetApp(App):
         )
         game_layout.add_widget(self.status_label)
 
-        self.board_widget = BoardWidget(size_hint=(1, 0.7))
-        game_layout.add_widget(self.board_widget)
-        # In two player mode, we don't need AI depth, just set it to a default
+        # Create a float layout for the main game area
+        main_container = FloatLayout()
+
+        # Create and configure the board widget
+        self.board_widget = BoardWidget()
+        self.board_widget.size_hint = (1, 0.9)  # Slightly reduced height to accommodate controls
+        self.board_widget.pos_hint = {'center_x': 0.5, 'center_y': 0.55}  # Centered vertically
         self.board_widget.setup_game(self.human_player, self.ai_depth)
+        main_container.add_widget(self.board_widget)
 
-        control_panel = BoxLayout(size_hint=(1, 0.22), spacing=10, padding=10)
-
-        self.roll_button = Button(
-            text='ROLL DICE',
-            background_color=(0.95, 0.8, 0.2, 1),
-            font_size='24sp',
-            bold=True,
-            color=(0.3, 0.2, 0.1, 1)
-        )
-        self.roll_button.bind(on_press=self.on_roll_button_pressed)
-        control_panel.add_widget(self.roll_button)
-
-        self.dice_label = Label(
-            text='',
-            font_size='48sp',
-            bold=True,
-            color=(1, 0.9, 0.5, 1)
-        )
-        control_panel.add_widget(self.dice_label)
-
+        # Restart button - positioned in upper left corner, smaller
         btn_restart = Button(
             text='RESTART',
-            background_color=(0.7, 0.3, 0.3, 1),
+            size_hint=(0.2, 0.08),
+            pos_hint={'x': 0.02, 'top': 0.98},
+            background_normal='',  # Remove default background
+            background_color=(1, 1, 1, 0),  # Transparent background
             font_size='20sp',
-            bold=True
+            bold=True,
+            color=(0.9, 0.9, 0.9, 1),
+            halign='center',
+            valign='middle'
         )
+        # Add rounded rectangle using canvas.before
+        with btn_restart.canvas.before:
+            Color(0.7, 0.2, 0.2, 0.8)  # Darker red with transparency
+            btn_restart.rounded_rect = RoundedRectangle(
+                pos=btn_restart.pos,
+                size=btn_restart.size,
+                radius=[20]
+            )
+        # Bind the button press event
         btn_restart.bind(on_press=lambda x: self.restart_game())
-        control_panel.add_widget(btn_restart)
+        # Update the rounded rectangle when size/pos changes
+        btn_restart.bind(pos=lambda inst, val: setattr(inst.rounded_rect, 'pos', val))
+        btn_restart.bind(size=lambda inst, val: setattr(inst.rounded_rect, 'size', val))
+        main_container.add_widget(btn_restart)
 
-        game_layout.add_widget(control_panel)
+        # Label for dice indicator
+        dice_text_label = Label(
+            text='Dice:',
+            size_hint=(0.05, 0.06),
+            pos_hint={'center_x': 0.44, 'center_y': 0.25},  # Positioned to the left of the dice circle
+            font_size='20sp',
+            bold=True,
+            color=(0.2, 0.1, 0.05, 1),  # Light gold color to match theme
+            halign='center',
+            valign='middle'
+        )
+        main_container.add_widget(dice_text_label)
+
+        # Dice display - circular design centered below the board
+        self.dice_label = Label(
+            text='',
+            size_hint=(0.12, 0.12),  # Square aspect ratio for circle
+            pos_hint={'center_x': 0.56, 'center_y': 0.25},  # Positioned to the right of the text label
+            font_size='30sp',
+            bold=True,
+            color=(0.2, 0.1, 0.05, 1),  # Dark brown text for contrast
+            halign='center',
+            valign='middle',
+        )
+        # Add circular background using canvas.before
+        with self.dice_label.canvas.before:
+            Color(0.95, 0.8, 0.2, 1)  # Golden yellow background
+            self.dice_label.circle = Ellipse(
+                pos=self.dice_label.pos,
+                size=self.dice_label.size
+            )
+        # Bind position and size updates
+        self.dice_label.bind(pos=lambda inst, val: setattr(inst.circle, 'pos', val))
+        self.dice_label.bind(size=lambda inst, val: setattr(inst.circle, 'size', val))
+        main_container.add_widget(self.dice_label)
+
+        # Roll button - positioned in the center bottom of the screen, larger and beautiful
+        self.roll_button = Button(
+            text='ROLL DICE',
+            size_hint=(0.4, 0.12),
+            pos_hint={'center_x': 0.5, 'y': 0.02},
+            background_normal='',  # Remove default background
+            background_color=(1, 1, 1, 0),  # Transparent background
+            font_size='22sp',
+            bold=True,
+            color=(0.2, 0.1, 0.05, 1),
+            halign='center',
+            valign='middle'
+        )
+        # Add rounded rectangle using canvas.before
+        with self.roll_button.canvas.before:
+            Color(0.85, 0.65, 0.15, 1)  # Golden yellow
+            self.roll_button.rounded_rect = RoundedRectangle(
+                pos=self.roll_button.pos,
+                size=self.roll_button.size,
+                radius=[30]
+            )
+        # Bind the button press event
+        self.roll_button.bind(on_press=self.on_roll_button_pressed)
+        # Update the rounded rectangle when size/pos changes
+        self.roll_button.bind(pos=lambda inst, val: setattr(inst.rounded_rect, 'pos', val))
+        self.roll_button.bind(size=lambda inst, val: setattr(inst.rounded_rect, 'size', val))
+        main_container.add_widget(self.roll_button)
+
+        game_layout.add_widget(main_container)
         self.main_layout.add_widget(game_layout)
 
         # Start the game based on who goes first
@@ -642,7 +776,7 @@ class SenetApp(App):
                 # Computer's turn - start computer logic
                 self.status_label.text = '[b]Computer\'s turn...[/b]'
                 self.roll_button.disabled = True
-                Clock.schedule_once(lambda dt: self.computer_roll_dice(), 0.5)
+                Clock.schedule_once(lambda dt: self.computer_roll_dice(), 0.2)
     
     def on_roll_button_pressed(self, instance):
         """Handle human player clicking roll button"""
@@ -683,7 +817,7 @@ class SenetApp(App):
         """Animate dice rolling"""
         if count < 5:
             self.dice_label.text = f'{random.randint(1, 5)}'
-            Clock.schedule_once(lambda dt: self.animate_dice(count + 1, is_human), 0.1)
+            Clock.schedule_once(lambda dt: self.animate_dice(count + 1, is_human), 0.05)  # Reduced from 0.1 to 0.05 seconds
         else:
             # Dice animation complete, now roll actual dice
             roll = number_of_steps()
@@ -699,7 +833,7 @@ class SenetApp(App):
                     self.status_label.text = f'[b]Rolled {roll} - No moves available![/b]'
                 else:
                     self.status_label.text = f'[b]Computer rolled {roll} - No moves![/b]'
-                Clock.schedule_once(lambda dt: self.end_turn_no_moves(), 1.5)
+                Clock.schedule_once(lambda dt: self.end_turn_no_moves(), 1.0)
             else:
                 # Moves available
                 if is_human:
@@ -707,7 +841,7 @@ class SenetApp(App):
                     self.board_widget.bind(on_touch_down=self.on_human_move_click)
                 else:
                     self.status_label.text = f'[b]Computer rolled {roll} - Thinking...[/b]'
-                    Clock.schedule_once(lambda dt: self.computer_make_move(roll), 1.0)
+                    Clock.schedule_once(lambda dt: self.computer_make_move(roll), 0.5)
     
     def on_human_move_click(self, widget, touch):
         """Handle human player clicking to make a move"""
@@ -760,7 +894,7 @@ class SenetApp(App):
         # This method should only be called in single player mode
         if self.is_two_player_mode:
             # In two player mode, this shouldn't be called, but just in case:
-            Clock.schedule_once(lambda dt: self.end_turn_no_moves(), 0.5)
+            Clock.schedule_once(lambda dt: self.end_turn_no_moves(), 0.2)
             return
 
         best_move, nodes, score = get_best_move_expectiminimax(
@@ -775,7 +909,7 @@ class SenetApp(App):
             self.execute_move(old_pos, new_pos)
         else:
             # This shouldn't happen since we checked for moves, but just in case
-            Clock.schedule_once(lambda dt: self.end_turn_no_moves(), 0.5)
+            Clock.schedule_once(lambda dt: self.end_turn_no_moves(), 0.2)
     
     def execute_move(self, old_pos, new_pos):
         """Execute a move (works for both human and computer)"""
@@ -801,7 +935,7 @@ class SenetApp(App):
 
                     # Continue to next turn
                     self.dice_label.text = ''
-                    Clock.schedule_once(lambda dt: self.start_turn(), 0.5)
+                    Clock.schedule_once(lambda dt: self.start_turn(), 0.2)
                     return
             else:  # current player is 2
                 if old_pos not in self.board_widget.state.player_2_rocks_pos:
@@ -822,7 +956,7 @@ class SenetApp(App):
 
                     # Continue to next turn
                     self.dice_label.text = ''
-                    Clock.schedule_once(lambda dt: self.start_turn(), 0.5)
+                    Clock.schedule_once(lambda dt: self.start_turn(), 0.2)
                     return
 
             # Apply the move
@@ -860,7 +994,7 @@ class SenetApp(App):
             else:
                 # Continue to next turn
                 self.dice_label.text = ''
-                Clock.schedule_once(lambda dt: self.start_turn(), 0.5)
+                Clock.schedule_once(lambda dt: self.start_turn(), 0.2)
 
         # Animate the move
         self.board_widget.animate_piece_move(old_pos, new_pos, complete_move)
@@ -906,15 +1040,23 @@ class SenetApp(App):
         self.board_widget.update_board()
 
         # Start next player's turn
-        Clock.schedule_once(lambda dt: self.start_turn(), 0.5)
+        Clock.schedule_once(lambda dt: self.start_turn(), 0.2)
     
     def handle_game_over(self, winner):
         """Handle game over"""
-        if winner == self.human_player:
-            self.status_label.text = '[b][color=FFD700]VICTORY! YOU WIN![/color][/b]'
+        if self.is_two_player_mode:
+            # In two player mode, announce the winning player
+            if winner == 1:
+                self.status_label.text = '[b][color=FF6B6B]RED PLAYER WINS![/color][/b]'
+            else:
+                self.status_label.text = '[b][color=6B9DFF]BLUE PLAYER WINS![/color][/b]'
         else:
-            self.status_label.text = '[b][color=FF6B6B]Computer Wins![/color][/b]'
-        
+            # In single player mode, announce win/loss against AI
+            if winner == self.human_player:
+                self.status_label.text = '[b][color=FFD700]VICTORY! YOU WIN![/color][/b]'
+            else:
+                self.status_label.text = '[b][color=FF6B6B]Computer Wins![/color][/b]'
+
         self.board_widget.game_over = True
         self.roll_button.disabled = True
         self.roll_button.background_color = (0.5, 0.5, 0.5, 1)
