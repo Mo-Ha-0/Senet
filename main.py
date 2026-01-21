@@ -52,19 +52,20 @@ class BoardWidget(FloatLayout):
         self.cell_rects = []
         self.particles = []
         self.animation_running = False
+        self.needs_redraw = False
         
         # Bind events
         self.bind(size=self.on_size_change, pos=self.on_pos_change)
         
-        # Start particle update loop
-        Clock.schedule_interval(self.update_particles, 1/30)
+        # Reduce particle update frequency for better performance
+        Clock.schedule_interval(self.update_particles, 1/20)
     
     def on_size_change(self, *args):
         Clock.schedule_once(lambda dt: self.ensure_board_setup(), 0.01)
     
     def on_pos_change(self, *args):
         if self.state and self.cell_rects:
-            Clock.schedule_once(lambda dt: self.update_board(), 0.01)
+            self.needs_redraw = True
     
     def ensure_board_setup(self):
         if self.state:
@@ -82,7 +83,6 @@ class BoardWidget(FloatLayout):
         )
         self.calculate_cells()
         self.update_board()
-        Clock.schedule_once(lambda dt: self.update_board(), 0.1)
     
     def calculate_cells(self, *args):
         if self.width == 0 or self.height == 0:
@@ -122,17 +122,13 @@ class BoardWidget(FloatLayout):
     def draw_ankh_symbol(self, x, y, size, color_tuple):
         """Draw Egyptian Ankh symbol"""
         Color(*color_tuple)
-        # Circle (top)
         Ellipse(pos=(x + size*0.35, y + size*0.6), size=(size*0.3, size*0.3))
-        # Vertical line
         Rectangle(pos=(x + size*0.45, y + size*0.1), size=(size*0.1, size*0.65))
-        # Horizontal line
         Rectangle(pos=(x + size*0.25, y + size*0.45), size=(size*0.5, size*0.08))
     
     def draw_eye_of_horus(self, x, y, size, color_tuple):
         """Draw Eye of Horus symbol"""
         Color(*color_tuple)
-        # Main eye shape
         Line(points=[
             x + size*0.2, y + size*0.5,
             x + size*0.5, y + size*0.7,
@@ -140,9 +136,7 @@ class BoardWidget(FloatLayout):
             x + size*0.5, y + size*0.3,
             x + size*0.2, y + size*0.5
         ], width=2)
-        # Pupil
         Ellipse(pos=(x + size*0.45, y + size*0.45), size=(size*0.1, size*0.1))
-        # Spiral detail
         Line(points=[
             x + size*0.5, y + size*0.3,
             x + size*0.6, y + size*0.2,
@@ -164,7 +158,6 @@ class BoardWidget(FloatLayout):
     def draw_ankh_small(self, x, y, size, color_tuple):
         """Draw small Ankh for rebirth"""
         Color(*color_tuple)
-        # Simplified ankh
         Ellipse(pos=(x + size*0.4, y + size*0.65), size=(size*0.2, size*0.2))
         Rectangle(pos=(x + size*0.47, y + size*0.2), size=(size*0.06, size*0.5))
         Rectangle(pos=(x + size*0.3, y + size*0.55), size=(size*0.4, size*0.06))
@@ -182,13 +175,13 @@ class BoardWidget(FloatLayout):
             Color(0.95, 0.9, 0.75, 1)
             Rectangle(pos=self.pos, size=self.size)
             
-            # Add texture effect
-            for i in range(20):
+            # Reduced texture effect
+            for i in range(10):
                 Color(0.9, 0.85, 0.7, 0.1)
                 y_pos = self.y + random.uniform(0, self.height)
                 Rectangle(pos=(self.x, y_pos), size=(self.width, 2))
             
-            # Draw cells with Egyptian styling
+            # Draw cells
             for rect in self.cell_rects:
                 i = rect['index']
                 
@@ -207,21 +200,18 @@ class BoardWidget(FloatLayout):
                     else:
                         Color(0.7, 0.55, 0.3, 1)
                 
-                # Main cell
                 RoundedRectangle(
                     pos=(rect['x'], rect['y']),
                     size=(rect['size'], rect['size']),
                     radius=[6]
                 )
                 
-                # Ornate border
                 Color(0.6, 0.4, 0.1, 1)
                 Line(
                     rounded_rectangle=(rect['x'], rect['y'], rect['size'], rect['size'], 6),
                     width=3
                 )
                 
-                # Inner decorative border
                 Color(0.9, 0.7, 0.3, 0.5)
                 Line(
                     rounded_rectangle=(
@@ -231,7 +221,7 @@ class BoardWidget(FloatLayout):
                     width=1
                 )
                 
-                # Draw icons for special squares
+                # Draw icons
                 if board[i] == WATER:
                     self.draw_water_waves(rect['x'], rect['y'], rect['size'], (1, 1, 1, 0.8))
                 elif board[i] == REBIRTH:
@@ -241,7 +231,6 @@ class BoardWidget(FloatLayout):
                 elif board[i] == HORUS:
                     self.draw_eye_of_horus(rect['x'], rect['y'], rect['size'], (1, 0.9, 0.7, 1))
                 elif board[i] in (TRIPLE, DOUBLE):
-                    # Draw vertical bars instead of stars
                     num_bars = 3 if board[i] == TRIPLE else 2
                     Color(1, 0.9, 0.7, 0.95)
                     
@@ -255,13 +244,12 @@ class BoardWidget(FloatLayout):
                         bar_x = start_x + j * (bar_width * 1.5)
                         Rectangle(pos=(bar_x, start_y), size=(bar_width, bar_height))
                 
-                # Highlight available moves with glow
+                # Highlight available moves
                 if self.selected_rock is not None:
                     for old_pos, new_pos in self.available_moves_list:
                         if old_pos == self.selected_rock and new_pos == i:
-                            # Glowing highlight
-                            for glow_i in range(3):
-                                Color(0.2, 1, 0.4, 0.15 - glow_i*0.04)
+                            for glow_i in range(2):
+                                Color(0.2, 1, 0.4, 0.15 - glow_i*0.05)
                                 glow_size = rect['size'] + glow_i * 8
                                 glow_offset = glow_i * 4
                                 RoundedRectangle(
@@ -275,109 +263,95 @@ class BoardWidget(FloatLayout):
                                 width=4
                             )
             
-            # Draw pieces with enhanced 3D effect
+            # Draw pieces
             if self.state:
                 piece_size = self.cell_rects[0]['size'] * 0.55
                 
-                # Player 1 pieces (Red/Gold - Egyptian style)
+                # Player 1 pieces
                 for pos in self.state.player_1_rocks_pos:
                     if pos < 30:
                         rect = self.cell_rects[pos]
                         
-                        # Glow for selected piece
                         if self.selected_rock == pos:
-                            for i in range(4):
-                                Color(1, 0.6, 0.2, 0.2 - i*0.04)
+                            for i in range(2):
+                                Color(1, 0.6, 0.2, 0.2 - i*0.08)
                                 glow_size = piece_size + (i * 12)
                                 Ellipse(
                                     pos=(rect['center_x'] - glow_size/2, rect['center_y'] - glow_size/2),
                                     size=(glow_size, glow_size)
                                 )
                         
-                        # Large shadow
                         Color(0, 0, 0, 0.4)
                         Ellipse(
                             pos=(rect['center_x'] - piece_size/2 + 4, rect['center_y'] - piece_size/2 - 4),
                             size=(piece_size, piece_size)
                         )
                         
-                        # Gradient effect - dark base
                         Color(0.7, 0.2, 0.1, 1)
                         Ellipse(
                             pos=(rect['center_x'] - piece_size/2, rect['center_y'] - piece_size/2),
                             size=(piece_size, piece_size)
                         )
                         
-                        # Middle layer
                         Color(0.95, 0.3, 0.15, 1)
                         Ellipse(
                             pos=(rect['center_x'] - piece_size*0.4, rect['center_y'] - piece_size*0.4),
                             size=(piece_size*0.8, piece_size*0.8)
                         )
                         
-                        # Bright highlight
                         Color(1, 0.7, 0.5, 0.9)
                         Ellipse(
                             pos=(rect['center_x'] - piece_size*0.25, rect['center_y'] - piece_size*0.15),
                             size=(piece_size*0.35, piece_size*0.35)
                         )
                         
-                        # Gold rim
                         Color(1, 0.84, 0, 1)
                         Line(circle=(rect['center_x'], rect['center_y'], piece_size/2), width=3)
                         
-                        # Inner decorative circle
                         Color(0.8, 0.6, 0.2, 0.6)
                         Line(circle=(rect['center_x'], rect['center_y'], piece_size/2.5), width=1.5)
                 
-                # Player 2 pieces (Blue/Silver - Egyptian style)
+                # Player 2 pieces
                 for pos in self.state.player_2_rocks_pos:
                     if pos < 30:
                         rect = self.cell_rects[pos]
                         
-                        # Glow for selected piece
                         if self.selected_rock == pos:
-                            for i in range(4):
-                                Color(0.3, 0.6, 1, 0.2 - i*0.04)
+                            for i in range(2):
+                                Color(0.3, 0.6, 1, 0.2 - i*0.08)
                                 glow_size = piece_size + (i * 12)
                                 Ellipse(
                                     pos=(rect['center_x'] - glow_size/2, rect['center_y'] - glow_size/2),
                                     size=(glow_size, glow_size)
                                 )
                         
-                        # Large shadow
                         Color(0, 0, 0, 0.4)
                         Ellipse(
                             pos=(rect['center_x'] - piece_size/2 + 4, rect['center_y'] - piece_size/2 - 4),
                             size=(piece_size, piece_size)
                         )
                         
-                        # Gradient effect - dark base
                         Color(0.15, 0.35, 0.6, 1)
                         Ellipse(
                             pos=(rect['center_x'] - piece_size/2, rect['center_y'] - piece_size/2),
                             size=(piece_size, piece_size)
                         )
                         
-                        # Middle layer
                         Color(0.25, 0.55, 0.9, 1)
                         Ellipse(
                             pos=(rect['center_x'] - piece_size*0.4, rect['center_y'] - piece_size*0.4),
                             size=(piece_size*0.8, piece_size*0.8)
                         )
                         
-                        # Bright highlight
                         Color(0.6, 0.85, 1, 0.9)
                         Ellipse(
                             pos=(rect['center_x'] - piece_size*0.25, rect['center_y'] - piece_size*0.15),
                             size=(piece_size*0.35, piece_size*0.35)
                         )
                         
-                        # Silver rim
                         Color(0.8, 0.85, 0.9, 1)
                         Line(circle=(rect['center_x'], rect['center_y'], piece_size/2), width=3)
                         
-                        # Inner decorative circle
                         Color(0.6, 0.65, 0.7, 0.6)
                         Line(circle=(rect['center_x'], rect['center_y'], piece_size/2.5), width=1.5)
             
@@ -390,8 +364,9 @@ class BoardWidget(FloatLayout):
                 )
         
         self.canvas.ask_update()
+        self.needs_redraw = False
     
-    def create_particles(self, x, y, color, count=15):
+    def create_particles(self, x, y, color, count=10):
         """Create particle explosion effect"""
         for _ in range(count):
             angle = random.uniform(0, 2 * math.pi)
@@ -403,7 +378,7 @@ class BoardWidget(FloatLayout):
     def update_particles(self, dt):
         """Update particle positions"""
         self.particles = [p for p in self.particles if p.update(dt)]
-        if self.particles:
+        if self.particles or self.needs_redraw:
             self.update_board()
     
     def animate_piece_move(self, from_pos, to_pos, callback):
@@ -414,23 +389,19 @@ class BoardWidget(FloatLayout):
         
         self.animation_running = True
         
-        # Create particle trail effect
         from_rect = self.cell_rects[from_pos]
         if to_pos < len(self.cell_rects):
             to_rect = self.cell_rects[to_pos]
             
-            # Particle color based on current player
             if self.state.current_player == 1:
                 color = (0.95, 0.3, 0.15, 1)
             else:
                 color = (0.25, 0.55, 0.9, 1)
             
-            # Create trail particles
-            self.create_particles(from_rect['center_x'], from_rect['center_y'], color, 10)
+            self.create_particles(from_rect['center_x'], from_rect['center_y'], color, 5)
             
-            # Flash at destination
             Clock.schedule_once(lambda dt: self.create_particles(
-                to_rect['center_x'], to_rect['center_y'], (1, 1, 0.5, 1), 20
+                to_rect['center_x'], to_rect['center_y'], (1, 1, 0.5, 1), 10
             ), 0.3)
         
         Clock.schedule_once(lambda dt: self.finish_animation(callback), 0.4)
@@ -460,9 +431,8 @@ class BoardWidget(FloatLayout):
                     self.available_moves_list = [(old_pos, new_pos) for old_pos, new_pos in
                                                 available_moves(self.state, self.current_roll)
                                                 if old_pos == i]
-                    # Particle burst on selection
                     color = (0.95, 0.3, 0.15, 1) if self.state.current_player == 1 else (0.25, 0.55, 0.9, 1)
-                    self.create_particles(rect['center_x'], rect['center_y'], color, 8)
+                    self.create_particles(rect['center_x'], rect['center_y'], color, 5)
                     self.update_board()
                     break
         
@@ -481,7 +451,6 @@ class SenetApp(App):
         
         layout = BoxLayout(orientation='vertical', padding=30, spacing=20)
         
-        # Clean title without symbols
         title = Label(
             text='[b][color=FFD700]SENET[/color][/b]\n[size=20][color=D4AF37]Ancient Egyptian Game of Passage[/color][/size]',
             markup=True,
@@ -543,7 +512,7 @@ class SenetApp(App):
         layout.add_widget(title)
         
         difficulties = [
-            ('very Easy', 1, (0.1, 0.5, 0.3, 1)),
+            ('Very Easy', 1, (0.1, 0.5, 0.3, 1)),
             ('Easy', 2, (0.2, 0.8, 0.4, 1)),
             ('Medium', 3, (0.95, 0.8, 0.2, 1)),
             ('Hard', 4, (0.95, 0.3, 0.25, 1)),
@@ -570,7 +539,7 @@ class SenetApp(App):
         game_layout = BoxLayout(orientation='vertical')
         
         self.status_label = Label(
-            text='[b]Tap ROLL to begin![/b]',
+            text='',
             markup=True,
             size_hint=(1, 0.08),
             font_size='20sp',
@@ -581,7 +550,6 @@ class SenetApp(App):
         self.board_widget = BoardWidget(size_hint=(1, 0.7))
         game_layout.add_widget(self.board_widget)
         self.board_widget.setup_game(self.human_player, self.ai_depth)
-        Clock.schedule_once(lambda dt: self.board_widget.update_board(), 0.1)
         
         control_panel = BoxLayout(size_hint=(1, 0.22), spacing=10, padding=10)
         
@@ -592,7 +560,7 @@ class SenetApp(App):
             bold=True,
             color=(0.3, 0.2, 0.1, 1)
         )
-        self.roll_button.bind(on_press=self.roll_dice)
+        self.roll_button.bind(on_press=self.on_roll_button_pressed)
         control_panel.add_widget(self.roll_button)
         
         self.dice_label = Label(
@@ -609,31 +577,58 @@ class SenetApp(App):
             font_size='20sp',
             bold=True
         )
-        btn_restart.bind(on_press=lambda x: self.show_start_screen())
+        btn_restart.bind(on_press=lambda x: self.restart_game())
         control_panel.add_widget(btn_restart)
         
         game_layout.add_widget(control_panel)
         self.main_layout.add_widget(game_layout)
         
-        if self.board_widget.state.current_player == self.computer_player:
-            Clock.schedule_once(lambda dt: self.computer_turn(), 1)
+        # Start the game based on who goes first
+        Clock.schedule_once(lambda dt: self.start_turn(), 0.1)
     
-    def roll_dice(self, instance):
-        if (self.board_widget.game_over or 
-            self.board_widget.state.current_player != self.human_player or
-            self.board_widget.current_roll is not None):
+    def start_turn(self):
+        """Start a new turn for the current player"""
+        if self.board_widget.game_over:
             return
         
-        # Animated dice roll
-        self.dice_label.text = 'Rolling...'
-        self.animate_dice_roll(0, lambda: None)
+        if self.board_widget.state.current_player == self.human_player:
+            # Human's turn - enable roll button
+            self.status_label.text = '[b]Your turn - Tap ROLL[/b]'
+            self.roll_button.disabled = False
+        else:
+            # Computer's turn - start computer logic
+            self.status_label.text = '[b]Computer\'s turn...[/b]'
+            self.roll_button.disabled = True
+            Clock.schedule_once(lambda dt: self.computer_roll_dice(), 0.5)
     
-    def animate_dice_roll(self, count, callback):
-        """Animated dice rolling effect"""
+    def on_roll_button_pressed(self, instance):
+        """Handle human player clicking roll button"""
+        if self.board_widget.game_over:
+            return
+        if self.board_widget.state.current_player != self.human_player:
+            return
+        
+        self.roll_button.disabled = True
+        self.human_roll_dice()
+    
+    def human_roll_dice(self):
+        """Human player rolls the dice"""
+        self.dice_label.text = 'Rolling...'
+        self.animate_dice(0, is_human=True)
+    
+    def computer_roll_dice(self):
+        """Computer player rolls the dice"""
+        self.dice_label.text = 'Rolling...'
+        self.status_label.text = '[b]Computer is rolling...[/b]'
+        self.animate_dice(0, is_human=False)
+    
+    def animate_dice(self, count, is_human):
+        """Animate dice rolling"""
         if count < 5:
             self.dice_label.text = f'{random.randint(1, 5)}'
-            Clock.schedule_once(lambda dt: self.animate_dice_roll(count + 1, callback), 0.1)
+            Clock.schedule_once(lambda dt: self.animate_dice(count + 1, is_human), 0.1)
         else:
+            # Dice animation complete, now roll actual dice
             roll = number_of_steps()
             self.board_widget.current_roll = roll
             self.dice_label.text = f'{roll}'
@@ -642,20 +637,36 @@ class SenetApp(App):
             self.board_widget.available_moves_list = moves
             
             if not moves:
-                self.status_label.text = f'[b]Rolled {roll} - No moves![/b]'
-                Clock.schedule_once(lambda dt: self.skip_turn(), 1.5)
+                # No moves available
+                if is_human:
+                    self.status_label.text = f'[b]Rolled {roll} - No moves available![/b]'
+                else:
+                    self.status_label.text = f'[b]Computer rolled {roll} - No moves![/b]'
+                Clock.schedule_once(lambda dt: self.end_turn_no_moves(), 1.5)
             else:
-                self.status_label.text = f'[b]Rolled {roll} - Select your piece[/b]'
-                self.board_widget.bind(on_touch_down=self.handle_move_selection)
+                # Moves available
+                if is_human:
+                    self.status_label.text = f'[b]Rolled {roll} - Select your piece[/b]'
+                    self.board_widget.bind(on_touch_down=self.on_human_move_click)
+                else:
+                    self.status_label.text = f'[b]Computer rolled {roll} - Thinking...[/b]'
+                    Clock.schedule_once(lambda dt: self.computer_make_move(roll), 1.0)
     
-    def handle_move_selection(self, widget, touch):
+    def on_human_move_click(self, widget, touch):
+        """Handle human player clicking to make a move"""
+        if widget.selected_rock is None:
+            return
+        
         for old_pos, new_pos in widget.available_moves_list:
             if old_pos == widget.selected_rock:
                 is_valid_click = False
                 
+                # Check if clicking on destination
                 if new_pos >= len(board):
+                    # Bearing off - any click is valid
                     is_valid_click = True
                 else:
+                    # Check if clicking on the destination cell
                     for rect in widget.cell_rects:
                         if rect['index'] == new_pos:
                             if (rect['x'] <= touch.x <= rect['x'] + rect['size'] and
@@ -664,126 +675,160 @@ class SenetApp(App):
                                 break
                 
                 if is_valid_click:
-                    widget.unbind(on_touch_down=self.handle_move_selection)
-                    
-                    def execute_move():
-                        player_1_rocks_pos, player_1_rocks, player_2_rocks_pos, player_2_rocks, rock_idx = \
-                            apply_move_lists(widget.state, (old_pos, new_pos))
-                        
-                        if widget.state.current_player == 1:
-                            player_1_rocks_pos, player_1_rocks = handle_rebirth(
-                                player_1_rocks_pos, player_1_rocks, player_2_rocks, rock_idx
-                            )
-                        else:
-                            player_2_rocks_pos, player_2_rocks = handle_rebirth(
-                                player_2_rocks_pos, player_2_rocks, player_1_rocks, rock_idx
-                            )
-                        
-                        widget.state = GameState(
-                            player_1_rocks_pos=tuple(player_1_rocks_pos),
-                            player_2_rocks_pos=tuple(player_2_rocks_pos),
-                            current_player=2 if widget.state.current_player == 1 else 1,
-                        )
-                        
-                        widget.current_roll = None
-                        widget.selected_rock = None
-                        widget.available_moves_list = []
-                        widget.update_board()
-                        
-                        if widget.state.is_terminal():
-                            self.handle_game_over(widget.state.winner())
-                        else:
-                            self.dice_label.text = ''
-                            if widget.state.current_player == self.computer_player:
-                                Clock.schedule_once(lambda dt: self.computer_turn(), 1)
-                            else:
-                                self.status_label.text = '[b]Your turn - Tap ROLL[/b]'
-                    
-                    widget.animate_piece_move(old_pos, new_pos, execute_move)
+                    # Valid move clicked
+                    widget.unbind(on_touch_down=self.on_human_move_click)
+                    self.execute_move(old_pos, new_pos)
                     return
     
-    def skip_turn(self):
-        self.board_widget.state = GameState(
-            player_1_rocks_pos=self.board_widget.state.player_1_rocks_pos,
-            player_2_rocks_pos=self.board_widget.state.player_2_rocks_pos,
-            current_player=2 if self.board_widget.state.current_player == 1 else 1,
-        )
-        self.board_widget.current_roll = None
-        self.dice_label.text = ''
-        
-        if self.board_widget.state.current_player == self.computer_player:
-            Clock.schedule_once(lambda dt: self.computer_turn(), 1)
-        else:
-            self.status_label.text = '[b]Your turn - Tap ROLL[/b]'
-    
-    def computer_turn(self):
-        if self.board_widget.game_over:
-            return
-        
-        self.roll_button.disabled = True
-        
-        # Animated computer dice roll
-        self.animate_dice_roll(0, lambda: None)
-        Clock.schedule_once(lambda dt: self.computer_roll_complete(), 0.6)
-    
-    def computer_roll_complete(self):
-        roll = number_of_steps()
-        self.board_widget.current_roll = roll
-        self.dice_label.text = f'{roll}'
-        self.status_label.text = f'[b]Computer rolled {roll}[/b]'
-        
-        moves = available_moves(self.board_widget.state, roll)
-        
-        if not moves:
-            self.status_label.text = f'[b]Computer rolled {roll} - No moves![/b]'
-            Clock.schedule_once(lambda dt: self.skip_turn(), 1.5)
-            return
-        
-        self.status_label.text = '[b]Computer thinking...[/b]'
-        Clock.schedule_once(lambda dt: self.execute_computer_move(roll), 1)
-    
-    def execute_computer_move(self, roll):
+    def computer_make_move(self, roll):
+        """Computer calculates and makes its move"""
         best_move, nodes, score = get_best_move_expectiminimax(
-            self.board_widget.state, roll, depth=self.ai_depth, reporting=False
+            self.board_widget.state, 
+            roll,  # Use the roll parameter directly
+            depth=self.ai_depth, 
+            reporting=False
         )
         
         if best_move:
             old_pos, new_pos = best_move
-            
-            def complete_computer_move():
-                player_1_rocks_pos, player_1_rocks, player_2_rocks_pos, player_2_rocks, rock_idx = \
-                    apply_move_lists(self.board_widget.state, best_move)
-                
-                if self.board_widget.state.current_player == 1:
-                    player_1_rocks_pos, player_1_rocks = handle_rebirth(
-                        player_1_rocks_pos, player_1_rocks, player_2_rocks, rock_idx
-                    )
-                else:
-                    player_2_rocks_pos, player_2_rocks = handle_rebirth(
-                        player_2_rocks_pos, player_2_rocks, player_1_rocks, rock_idx
-                    )
-                
-                self.board_widget.state = GameState(
-                    player_1_rocks_pos=tuple(player_1_rocks_pos),
-                    player_2_rocks_pos=tuple(player_2_rocks_pos),
-                    current_player=2 if self.board_widget.state.current_player == 1 else 1,
-                )
-                
-                self.board_widget.current_roll = None
-                self.board_widget.update_board()
-                
-                if self.board_widget.state.is_terminal():
-                    self.handle_game_over(self.board_widget.state.winner())
-                else:
-                    self.dice_label.text = ''
-                    self.status_label.text = '[b]Your turn - Tap ROLL[/b]'
-                    self.roll_button.disabled = False
-            
-            self.board_widget.animate_piece_move(old_pos, new_pos, complete_computer_move)
+            self.execute_move(old_pos, new_pos)
         else:
-            Clock.schedule_once(lambda dt: self.skip_turn(), 1)
+            # This shouldn't happen since we checked for moves, but just in case
+            Clock.schedule_once(lambda dt: self.end_turn_no_moves(), 0.5)
+    
+    def execute_move(self, old_pos, new_pos):
+        """Execute a move (works for both human and computer)"""
+        def complete_move():
+            # Check if the piece still exists at old_pos before applying the move
+            # This handles cases where the game state changed between scheduling and executing the move
+            if self.board_widget.state.current_player == 1:
+                if old_pos not in self.board_widget.state.player_1_rocks_pos:
+                    # The piece is no longer at old_pos (possibly due to rebirth or bearing off)
+                    # Just switch turns without applying the move
+                    self.board_widget.state = GameState(
+                        player_1_rocks_pos=self.board_widget.state.player_1_rocks_pos,
+                        player_2_rocks_pos=self.board_widget.state.player_2_rocks_pos,
+                        current_player=2 if self.board_widget.state.current_player == 1 else 1,
+                    )
+                    # Clear move state
+                    self.board_widget.current_roll = None
+                    self.board_widget.selected_rock = None
+                    self.board_widget.available_moves_list = []
+
+                    # Update the board to reflect any changes
+                    self.board_widget.update_board()
+
+                    # Continue to next turn
+                    self.dice_label.text = ''
+                    Clock.schedule_once(lambda dt: self.start_turn(), 0.5)
+                    return
+            else:  # current player is 2
+                if old_pos not in self.board_widget.state.player_2_rocks_pos:
+                    # The piece is no longer at old_pos (possibly due to rebirth or bearing off)
+                    # Just switch turns without applying the move
+                    self.board_widget.state = GameState(
+                        player_1_rocks_pos=self.board_widget.state.player_1_rocks_pos,
+                        player_2_rocks_pos=self.board_widget.state.player_2_rocks_pos,
+                        current_player=2 if self.board_widget.state.current_player == 1 else 1,
+                    )
+                    # Clear move state
+                    self.board_widget.current_roll = None
+                    self.board_widget.selected_rock = None
+                    self.board_widget.available_moves_list = []
+
+                    # Update the board to reflect any changes
+                    self.board_widget.update_board()
+
+                    # Continue to next turn
+                    self.dice_label.text = ''
+                    Clock.schedule_once(lambda dt: self.start_turn(), 0.5)
+                    return
+
+            # Apply the move
+            player_1_rocks_pos, player_1_rocks, player_2_rocks_pos, player_2_rocks, rock_idx = \
+                apply_move_lists(self.board_widget.state, (old_pos, new_pos))
+
+            # Handle rebirth for other conditions (water, etc.)
+            if self.board_widget.state.current_player == 1:
+                player_1_rocks_pos, player_1_rocks = handle_rebirth(
+                    player_1_rocks_pos, player_1_rocks, player_2_rocks, rock_idx
+                )
+            else:
+                player_2_rocks_pos, player_2_rocks = handle_rebirth(
+                    player_2_rocks_pos, player_2_rocks, player_1_rocks, rock_idx
+                )
+
+            # Create new state with switched player
+            self.board_widget.state = GameState(
+                player_1_rocks_pos=tuple(player_1_rocks_pos),
+                player_2_rocks_pos=tuple(player_2_rocks_pos),
+                current_player=2 if self.board_widget.state.current_player == 1 else 1,
+            )
+
+            # Clear move state
+            self.board_widget.current_roll = None
+            self.board_widget.selected_rock = None
+            self.board_widget.available_moves_list = []
+
+            # Update the board to reflect the move and any rebirth changes
+            self.board_widget.update_board()
+
+            # Check for game over
+            if self.board_widget.state.is_terminal():
+                self.handle_game_over(self.board_widget.state.winner())
+            else:
+                # Continue to next turn
+                self.dice_label.text = ''
+                Clock.schedule_once(lambda dt: self.start_turn(), 0.5)
+
+        # Animate the move
+        self.board_widget.animate_piece_move(old_pos, new_pos, complete_move)
+    
+    def end_turn_no_moves(self):
+        """End turn when no moves are available"""
+        # Handle rebirth for pieces that are on special positions (like 27, 28)
+        # Apply rebirth logic before switching players
+        from actions import handle_rebirth
+
+        # Since no move was made, rock_idx is irrelevant, we can use -1
+        rock_idx = -1
+
+        player_1_rocks_pos = list(self.board_widget.state.player_1_rocks_pos)
+        player_1_rocks = list(self.board_widget.state.player_1_rocks)
+        player_2_rocks_pos = list(self.board_widget.state.player_2_rocks_pos)
+        player_2_rocks = list(self.board_widget.state.player_2_rocks)
+
+        # Handle rebirth for current player
+        if self.board_widget.state.current_player == 1:
+            player_1_rocks_pos, player_1_rocks = handle_rebirth(
+                player_1_rocks_pos, player_1_rocks, player_2_rocks, rock_idx
+            )
+        else:
+            player_2_rocks_pos, player_2_rocks = handle_rebirth(
+                player_2_rocks_pos, player_2_rocks, player_1_rocks, rock_idx
+            )
+
+        # Switch to next player
+        self.board_widget.state = GameState(
+            player_1_rocks_pos=tuple(player_1_rocks_pos),
+            player_2_rocks_pos=tuple(player_2_rocks_pos),
+            current_player=2 if self.board_widget.state.current_player == 1 else 1,
+        )
+
+        # Clear move state
+        self.board_widget.current_roll = None
+        self.board_widget.selected_rock = None
+        self.board_widget.available_moves_list = []
+        self.dice_label.text = ''
+
+        # Update the board to reflect any rebirth changes immediately
+        self.board_widget.update_board()
+
+        # Start next player's turn
+        Clock.schedule_once(lambda dt: self.start_turn(), 0.5)
     
     def handle_game_over(self, winner):
+        """Handle game over"""
         if winner == self.human_player:
             self.status_label.text = '[b][color=FFD700]VICTORY! YOU WIN![/color][/b]'
         else:
@@ -792,6 +837,34 @@ class SenetApp(App):
         self.board_widget.game_over = True
         self.roll_button.disabled = True
         self.roll_button.background_color = (0.5, 0.5, 0.5, 1)
+
+    def restart_game(self):
+        """Completely reset the game state"""
+        # Cancel all scheduled events to prevent them from executing after restart
+        from kivy.clock import Clock
+        # Unschedule specific known events
+        Clock.unschedule(self.start_turn)
+        Clock.unschedule(self.computer_roll_dice)
+        Clock.unschedule(self.computer_make_move)
+        Clock.unschedule(self.end_turn_no_moves)
+        Clock.unschedule(self.handle_game_over)
+
+        # Clear the main layout to ensure no widgets remain from the previous game
+        self.main_layout.clear_widgets()
+
+        # Also clear the board widget's animation state if it exists
+        if hasattr(self, 'board_widget') and self.board_widget:
+            # Stop any ongoing animations
+            self.board_widget.animation_running = False
+            # Clear any scheduled animations
+            self.board_widget.current_roll = None
+            self.board_widget.selected_rock = None
+            self.board_widget.available_moves_list = []
+            # Reset game over flag
+            self.board_widget.game_over = False
+
+        # Show the start screen again
+        self.show_start_screen()
 
 
 if __name__ == '__main__':
