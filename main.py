@@ -414,8 +414,21 @@ class BoardWidget(FloatLayout):
     def on_touch_down(self, touch):
         if self.game_over or not self.state or self.animation_running:
             return super().on_touch_down(touch)
-        
-        if self.state.current_player != self.human_player or self.current_roll is None:
+
+        # Check if it's a human player's turn
+        # In two-player mode, both players are human, so check if it's the current player's turn
+        # In single-player mode, only the designated human player can play
+        app_instance = App.get_running_app()
+        is_current_player_human = False
+
+        if hasattr(app_instance, 'is_two_player_mode') and app_instance.is_two_player_mode:
+            # In two player mode, whoever's turn it is can play (both are human)
+            is_current_player_human = True
+        else:
+            # In single player mode, only the human player can play
+            is_current_player_human = (self.state.current_player == app_instance.human_player)
+
+        if not is_current_player_human or self.current_roll is None:
             return super().on_touch_down(touch)
         
         for rect in self.cell_rects:
@@ -448,9 +461,9 @@ class SenetApp(App):
     
     def show_start_screen(self):
         self.main_layout.clear_widgets()
-        
+
         layout = BoxLayout(orientation='vertical', padding=30, spacing=20)
-        
+
         title = Label(
             text='[b][color=FFD700]SENET[/color][/b]\n[size=20][color=D4AF37]Ancient Egyptian Game of Passage[/color][/size]',
             markup=True,
@@ -458,30 +471,41 @@ class SenetApp(App):
             font_size='48sp'
         )
         layout.add_widget(title)
-        
+
         btn_player1 = Button(
-            text='Play as RED',
-            size_hint=(1, 0.15),
+            text='Play as RED vs AI',
+            size_hint=(1, 0.12),
             background_color=(0.95, 0.3, 0.25, 1),
-            font_size='22sp',
+            font_size='20sp',
             bold=True,
             color=(1, 1, 1, 1)
         )
         btn_player1.bind(on_press=lambda x: self.select_player(1))
-        
+
         btn_player2 = Button(
-            text='Play as BLUE',
-            size_hint=(1, 0.15),
+            text='Play as BLUE vs AI',
+            size_hint=(1, 0.12),
             background_color=(0.25, 0.55, 0.9, 1),
-            font_size='22sp',
+            font_size='20sp',
             bold=True,
             color=(1, 1, 1, 1)
         )
         btn_player2.bind(on_press=lambda x: self.select_player(2))
-        
+
+        btn_two_players = Button(
+            text='Two Players Mode',
+            size_hint=(1, 0.12),
+            background_color=(0.1, 0.6, 0.3, 1),
+            font_size='20sp',
+            bold=True,
+            color=(1, 1, 1, 1)
+        )
+        btn_two_players.bind(on_press=lambda x: self.start_two_player_game())
+
         layout.add_widget(btn_player1)
         layout.add_widget(btn_player2)
-        
+        layout.add_widget(btn_two_players)
+
         instructions = Label(
             text='- Tap piece to select\n- Tap glowing square to move\n- First to remove all pieces wins',
             size_hint=(1, 0.2),
@@ -489,13 +513,21 @@ class SenetApp(App):
             color=(0.9, 0.85, 0.7, 1)
         )
         layout.add_widget(instructions)
-        
+
         self.main_layout.add_widget(layout)
     
     def select_player(self, player):
         self.human_player = player
         self.computer_player = 2 if player == 1 else 1
+        self.is_two_player_mode = False  # Single player vs AI mode
         self.show_difficulty_screen()
+
+    def start_two_player_game(self):
+        """Initialize two player mode"""
+        self.human_player = 1  # Player 1 (RED) starts
+        self.computer_player = 2  # Player 2 (BLUE) is the second human player
+        self.is_two_player_mode = True  # Two player mode
+        self.start_game(1)  # Use minimal difficulty since there's no AI
     
     def show_difficulty_screen(self):
         self.main_layout.clear_widgets()
@@ -535,9 +567,9 @@ class SenetApp(App):
     def start_game(self, depth):
         self.ai_depth = depth
         self.main_layout.clear_widgets()
-        
+
         game_layout = BoxLayout(orientation='vertical')
-        
+
         self.status_label = Label(
             text='',
             markup=True,
@@ -546,13 +578,14 @@ class SenetApp(App):
             color=(1, 0.95, 0.7, 1)
         )
         game_layout.add_widget(self.status_label)
-        
+
         self.board_widget = BoardWidget(size_hint=(1, 0.7))
         game_layout.add_widget(self.board_widget)
+        # In two player mode, we don't need AI depth, just set it to a default
         self.board_widget.setup_game(self.human_player, self.ai_depth)
-        
+
         control_panel = BoxLayout(size_hint=(1, 0.22), spacing=10, padding=10)
-        
+
         self.roll_button = Button(
             text='ROLL DICE',
             background_color=(0.95, 0.8, 0.2, 1),
@@ -562,7 +595,7 @@ class SenetApp(App):
         )
         self.roll_button.bind(on_press=self.on_roll_button_pressed)
         control_panel.add_widget(self.roll_button)
-        
+
         self.dice_label = Label(
             text='',
             font_size='48sp',
@@ -570,7 +603,7 @@ class SenetApp(App):
             color=(1, 0.9, 0.5, 1)
         )
         control_panel.add_widget(self.dice_label)
-        
+
         btn_restart = Button(
             text='RESTART',
             background_color=(0.7, 0.3, 0.3, 1),
@@ -579,10 +612,10 @@ class SenetApp(App):
         )
         btn_restart.bind(on_press=lambda x: self.restart_game())
         control_panel.add_widget(btn_restart)
-        
+
         game_layout.add_widget(control_panel)
         self.main_layout.add_widget(game_layout)
-        
+
         # Start the game based on who goes first
         Clock.schedule_once(lambda dt: self.start_turn(), 0.1)
     
@@ -590,24 +623,43 @@ class SenetApp(App):
         """Start a new turn for the current player"""
         if self.board_widget.game_over:
             return
-        
-        if self.board_widget.state.current_player == self.human_player:
-            # Human's turn - enable roll button
-            self.status_label.text = '[b]Your turn - Tap ROLL[/b]'
+
+        current_player = self.board_widget.state.current_player
+
+        if self.is_two_player_mode:
+            # In two player mode, both players are human
+            player_color = "RED" if current_player == 1 else "BLUE"
+            self.status_label.text = f'[b]{player_color}\'s turn - Tap ROLL[/b]'
             self.roll_button.disabled = False
         else:
-            # Computer's turn - start computer logic
-            self.status_label.text = '[b]Computer\'s turn...[/b]'
-            self.roll_button.disabled = True
-            Clock.schedule_once(lambda dt: self.computer_roll_dice(), 0.5)
+            # Single player mode (vs AI)
+            if current_player == self.human_player:
+                # Human's turn - enable roll button
+                player_color = "RED" if self.human_player == 1 else "BLUE"
+                self.status_label.text = f'[b]{player_color}\'s turn - Tap ROLL[/b]'
+                self.roll_button.disabled = False
+            else:
+                # Computer's turn - start computer logic
+                self.status_label.text = '[b]Computer\'s turn...[/b]'
+                self.roll_button.disabled = True
+                Clock.schedule_once(lambda dt: self.computer_roll_dice(), 0.5)
     
     def on_roll_button_pressed(self, instance):
         """Handle human player clicking roll button"""
         if self.board_widget.game_over:
             return
-        if self.board_widget.state.current_player != self.human_player:
-            return
-        
+
+        current_player = self.board_widget.state.current_player
+
+        if self.is_two_player_mode:
+            # In two player mode, any player can roll when it's their turn
+            # No need to check against self.human_player since both are human
+            pass
+        else:
+            # In single player mode, only the human player can roll when it's their turn
+            if current_player != self.human_player:
+                return
+
         self.roll_button.disabled = True
         self.human_roll_dice()
     
@@ -618,6 +670,11 @@ class SenetApp(App):
     
     def computer_roll_dice(self):
         """Computer player rolls the dice"""
+        # This method should only be called in single player mode
+        if self.is_two_player_mode:
+            # In two player mode, this shouldn't be called, but just in case:
+            return
+
         self.dice_label.text = 'Rolling...'
         self.status_label.text = '[b]Computer is rolling...[/b]'
         self.animate_dice(0, is_human=False)
@@ -656,11 +713,29 @@ class SenetApp(App):
         """Handle human player clicking to make a move"""
         if widget.selected_rock is None:
             return
-        
+
+        # Check if the current player is allowed to make this move
+        current_player = widget.state.current_player
+        if self.is_two_player_mode:
+            # In two player mode, the current player in the game state should be able to move
+            # The selected rock should belong to the current player
+            positions = (widget.state.player_1_rocks_pos if current_player == 1
+                       else widget.state.player_2_rocks_pos)
+
+            if widget.selected_rock not in positions:
+                return  # Selected rock doesn't belong to current player
+        else:
+            # In single player mode, only the human player can move
+            positions = (widget.state.player_1_rocks_pos if self.human_player == 1
+                       else widget.state.player_2_rocks_pos)
+
+            if widget.selected_rock not in positions:
+                return  # Selected rock doesn't belong to human player
+
         for old_pos, new_pos in widget.available_moves_list:
             if old_pos == widget.selected_rock:
                 is_valid_click = False
-                
+
                 # Check if clicking on destination
                 if new_pos >= len(board):
                     # Bearing off - any click is valid
@@ -673,7 +748,7 @@ class SenetApp(App):
                                 rect['y'] <= touch.y <= rect['y'] + rect['size']):
                                 is_valid_click = True
                                 break
-                
+
                 if is_valid_click:
                     # Valid move clicked
                     widget.unbind(on_touch_down=self.on_human_move_click)
@@ -682,13 +757,19 @@ class SenetApp(App):
     
     def computer_make_move(self, roll):
         """Computer calculates and makes its move"""
+        # This method should only be called in single player mode
+        if self.is_two_player_mode:
+            # In two player mode, this shouldn't be called, but just in case:
+            Clock.schedule_once(lambda dt: self.end_turn_no_moves(), 0.5)
+            return
+
         best_move, nodes, score = get_best_move_expectiminimax(
-            self.board_widget.state, 
+            self.board_widget.state,
             roll,  # Use the roll parameter directly
-            depth=self.ai_depth, 
+            depth=self.ai_depth,
             reporting=False
         )
-        
+
         if best_move:
             old_pos, new_pos = best_move
             self.execute_move(old_pos, new_pos)
