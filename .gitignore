@@ -25,6 +25,7 @@ wheels/
 .buildozer/
 bin/
 .libs/
+buildozer.spec
 
 # Virtual environments
 venv/
