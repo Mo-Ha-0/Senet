@@ -101,7 +101,11 @@ class SenetApp(App):
             ('Easy', 2, (0.2, 0.8, 0.4, 1)),
             ('Medium', 3, (0.95, 0.8, 0.2, 1)),
             ('Hard', 4, (0.95, 0.3, 0.25, 1)),
-            ('Expert', 5, (0.6, 0.1, 0.1, 1))
+            ('Expert', 5, (0.6, 0.1, 0.1, 1)),
+            ('Master', 6, (0.5, 0.0, 0.5, 1)),
+            ('Legendary', 7, (0.8, 0.0, 0.8, 1)),
+            ('Mythic', 8, (0.9, 0.6, 0.2, 1)),
+            ('Immortal(too slow!)', 9, (1.0, 0.84, 0.0, 1)),
         ]
         
         for name, depth, color in difficulties:

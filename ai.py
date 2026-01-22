@@ -1,7 +1,6 @@
 from dataclasses import dataclass
-from state import GameState, board
+from state import GameState, board, HAPPY, WATER
 from actions import available_moves, apply_move_lists, handle_rebirth
-from state import HAPPY, WATER
 
 VERBOSE = False
 def evaluate_state(state: GameState, player: int):
@@ -91,9 +90,6 @@ def evaluate_state(state: GameState, player: int):
 
     if player_pieces_remaining <= 2 and opponent_pieces_remaining <= 2:
         score += (player_advancement - opponent_advancement) * 0.15
-
-    tie_breaker = (total_p - total_o) % 3
-    score += tie_breaker * 0.01
 
     if VERBOSE:
         print(

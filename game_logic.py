@@ -3,7 +3,8 @@ from kivy.clock import Clock
 
 from state import GameState, board
 from actions import number_of_steps, available_moves, apply_move_lists, handle_rebirth
-from ai import get_best_move_expectiminimax
+# from ai import get_best_move_expectiminimax
+from ai_wrapper import get_best_move_expectiminimax
 
 
 class GameLogic:
@@ -128,7 +129,8 @@ class GameLogic:
             self.app.board_widget.state,
             roll,
             depth=self.app.ai_depth,
-            reporting=False
+            reporting=False,
+            use_cpp=True
         )
 
         if best_move:
