@@ -25,7 +25,6 @@ wheels/
 .buildozer/
 bin/
 .libs/
-buildozer.spec
 
 # Virtual environments
 venv/
@@ -165,4 +164,3 @@ dmypy.json
 
 # Android build outputs
 android/
-*.so
