@@ -189,9 +189,7 @@ class debug:
     def pruned_branches(self):
         self.pruned_count += 1
 
-def expectiminimax(state: GameState, depth, player, stats, reporting,alpha, beta, tt):
-    # if tt is None:
-    #     tt = TranspositionTable()
+def expectiminimax(state: GameState, depth, player, stats, reporting, alpha, beta, tt):
 
     stats.visit()
 
@@ -200,6 +198,7 @@ def expectiminimax(state: GameState, depth, player, stats, reporting,alpha, beta
         if reporting:
             print(f"TranspositionTable find match, depth={depth} value={cache:.2f}")
         return cache
+
     if depth == 0 or state.is_terminal():
         eval_state = evaluate_state(state, player)
         tt.store(state, depth, eval_state)
@@ -207,29 +206,20 @@ def expectiminimax(state: GameState, depth, player, stats, reporting,alpha, beta
             print(f"leaf depth={depth} val={eval_state:.2f}")
         return eval_state
 
-    eval_state = chance_node(state, depth, player, stats, reporting, alpha, beta, tt)
-    tt.store(state, depth, eval_state)
-    return eval_state
+    total_expected_value = 0.0
+    probabilities = get_dice_probabilities()
 
-def chance_node(state, depth, player, stats, reporting, alpha, beta, tt):
-    total_ev = 0.0
-    propabilities = get_dice_probabilities()
-
-    for roll, prob in propabilities.items():
-        if VERBOSE :
-            # print('*'*88)
+    for roll, prob in probabilities.items():
+        if VERBOSE:
             print(f"[chance] roll={roll} prob={prob:.2f}")
         if reporting:
             print(f"chance roll={roll} prob={prob:.2f}")
+
         moves = available_moves(state, roll)
 
         if not moves:
-            if state.current_player == 1:
-                current_player = 2
-            else:
-                current_player = 1
-            next_state = GameState(state.player_1_rocks_pos, state.player_2_rocks_pos, current_player)
-            eval_for_roll = expectiminimax(next_state, depth - 1, player, stats, reporting, alpha, beta, tt)
+            next_state = GameState(state.player_1_rocks_pos, state.player_2_rocks_pos, 3 - state.current_player)
+            outcome_value = expectiminimax(next_state, depth - 1, player, stats, reporting, alpha, beta, tt)
         else:
             moves_with_scores = []
             for m in moves:
@@ -242,48 +232,64 @@ def chance_node(state, depth, player, stats, reporting, alpha, beta, tt):
             else:
                 moves_with_scores.sort(key=lambda x: x[1])
 
-            ordered = [t[0] for t in moves_with_scores]
-
             if state.current_player == player:
-                best = float('-inf')
-                for move in ordered:
-                    new_state = apply_move(state, move)
-                    sc = expectiminimax(new_state, depth - 1, player, stats, reporting, alpha, beta, tt)
-                    if sc > best:
-                        best = sc
-                    if sc > alpha:
-                        alpha = sc
-                    if reporting:
-                        print(f"  MAX {move} -> {sc:.2f}")
-                    if alpha >= beta:
-                        stats.pruned_branches()
-                        if reporting:
-                            print(f"  prune alpha({alpha:.2f}) >= beta({beta:.2f})")
-                        break
-                eval_for_roll = best
-            else:
-                best = float('inf')
-                for move in ordered:
-                    new_state = apply_move(state, move)
-                    sc = expectiminimax(new_state, depth - 1, player, stats, reporting, alpha, beta, tt=tt)
-                    if sc < best:
-                        best = sc
-                    if sc < beta:
-                        beta = sc
-                    if reporting:
-                        print(f"  MIN {move} -> {sc:.2f}")
-                    if alpha >= beta:
-                        stats.pruned_branches()
-                        if reporting:
-                            print(f"  prune alpha({alpha:.2f}) >= beta({beta:.2f})")
-                        break
-                eval_for_roll = best
+                best_value = float('-inf')
+                local_alpha = alpha
 
-        total_ev += prob * eval_for_roll
+                for move, _ in moves_with_scores:
+                    new_state = apply_move(state, move)
+                    child_value = expectiminimax(new_state, depth - 1, player, stats,
+                                                  reporting, local_alpha, beta, tt)
+
+                    if child_value > best_value:
+                        best_value = child_value
+
+                    if child_value > local_alpha:
+                        local_alpha = child_value
+
+                    if reporting:
+                        print(f"  MAX {move} -> {child_value:.2f}")
+
+                    if local_alpha >= beta:
+                        stats.pruned_branches()
+                        if reporting:
+                            print(f"  MAX prune: alpha({local_alpha:.2f}) >= beta({beta:.2f})")
+                        break
+
+                outcome_value = best_value
+            else:
+                best_value = float('inf')
+                local_beta = beta
+
+                for move, _ in moves_with_scores:
+                    new_state = apply_move(state, move)
+                    child_value = expectiminimax(new_state, depth - 1, player, stats,
+                                                  reporting, alpha, local_beta, tt)
+
+                    if child_value < best_value:
+                        best_value = child_value
+
+                    if child_value < local_beta:
+                        local_beta = child_value
+
+                    if reporting:
+                        print(f"  MIN {move} -> {child_value:.2f}")
+
+                    if alpha >= local_beta:
+                        stats.pruned_branches()
+                        if reporting:
+                            print(f"  MIN prune: alpha({alpha:.2f}) >= beta({local_beta:.2f})")
+                        break
+
+                outcome_value = best_value
+
+        total_expected_value += prob * outcome_value
 
     if reporting:
-        print(f"node value {total_ev:.2f}")
-    return total_ev
+        print(f"node value {total_expected_value:.2f}")
+
+    tt.store(state, depth, total_expected_value)
+    return total_expected_value
 
 
 def get_best_move_expectiminimax(state: GameState, roll, depth, reporting): 
@@ -318,7 +324,7 @@ def get_best_move_expectiminimax(state: GameState, roll, depth, reporting):
     # if best_move is None and moves:
     #     best_move = moves[0]
 
-    if reporting:
+    if True:
         print(f" selected {best_move} score={best_score:.2f} nodes={deb.nodes_visited} pruned={deb.pruned_count} ")
 
     return best_move, deb.nodes_visited, best_score

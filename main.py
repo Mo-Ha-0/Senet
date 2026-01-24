@@ -104,8 +104,6 @@ class SenetApp(App):
             ('Expert', 5, (0.6, 0.1, 0.1, 1)),
             ('Master', 6, (0.5, 0.0, 0.5, 1)),
             ('Legendary', 7, (0.8, 0.0, 0.8, 1)),
-            ('Mythic', 8, (0.9, 0.6, 0.2, 1)),
-            ('Immortal(too slow!)', 9, (1.0, 0.84, 0.0, 1)),
         ]
         
         for name, depth, color in difficulties:

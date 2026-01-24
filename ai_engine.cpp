@@ -128,7 +128,6 @@ GameState apply_move(const GameState& state, const pair<int, int>& move) {
     vector<bool> opp_bool(board.size(), false);
     for (int pos : opp_pos) opp_bool[pos] = true;
 
-    // finding the rock index being moved
     auto it = find(rocks_pos.begin(), rocks_pos.end(), old_pos);
     int rock_idx = distance(rocks_pos.begin(), it);
 
@@ -227,73 +226,6 @@ unordered_map<int, double> get_dice_probabilities() {
     return {{1, 4.0/16}, {2, 6.0/16}, {3, 4.0/16}, {4, 1.0/16}, {5, 1.0/16}};
 }
 
-double expectiminimax(const GameState& state, int depth, int player, Stats& stats, 
-                     double alpha, double beta, TranspositionTable& tt);
-
-double chance_node(const GameState& state, int depth, int player, Stats& stats,
-                  double alpha, double beta, TranspositionTable& tt) {
-    double total_ev = 0.0;
-    auto probabilities = get_dice_probabilities();
-
-    for (const auto& [roll, prob] : probabilities) {
-        auto moves = available_moves(state, roll);
-
-        double eval_for_roll;
-        if (moves.empty()) {
-            int next_player = (state.current_player == 1) ? 2 : 1;
-            GameState next_state(state.player_1_rocks_pos, state.player_2_rocks_pos, next_player);
-            eval_for_roll = expectiminimax(next_state, depth - 1, player, stats, alpha, beta, tt);
-        } else {
-            vector<pair<pair<int, int>, double>> moves_with_scores;
-            for (const auto& m : moves) {
-                GameState new_state = apply_move(state, m);
-                double score = evaluate_state(new_state, player);
-                moves_with_scores.push_back({m, score});
-            }
-
-            if (state.current_player == player) {
-                sort(moves_with_scores.begin(), moves_with_scores.end(),
-                         [](const auto& a, const auto& b) { return a.second > b.second; });
-            } else {
-                sort(moves_with_scores.begin(), moves_with_scores.end(),
-                         [](const auto& a, const auto& b) { return a.second < b.second; });
-            }
-
-            if (state.current_player == player) {
-                double best = -numeric_limits<double>::infinity();
-                for (const auto& [move, _] : moves_with_scores) {
-                    GameState new_state = apply_move(state, move);
-                    double sc = expectiminimax(new_state, depth - 1, player, stats, alpha, beta, tt);
-                    best = max(best, sc);
-                    alpha = max(alpha, sc);
-                    if (alpha >= beta) {
-                        stats.pruned();
-                        break;
-                    }
-                }
-                eval_for_roll = best;
-            } else {
-                double best = numeric_limits<double>::infinity();
-                for (const auto& [move, _] : moves_with_scores) {
-                    GameState new_state = apply_move(state, move);
-                    double sc = expectiminimax(new_state, depth - 1, player, stats, alpha, beta, tt);
-                    best = min(best, sc);
-                    beta = min(beta, sc);
-                    if (alpha >= beta) {
-                        stats.pruned();
-                        break;
-                    }
-                }
-                eval_for_roll = best;
-            }
-        }
-
-        total_ev += prob * eval_for_roll;
-    }
-
-    return total_ev;
-}
-
 double expectiminimax(const GameState& state, int depth, int player, Stats& stats,
                      double alpha, double beta, TranspositionTable& tt) {
     stats.visit();
@@ -309,29 +241,103 @@ double expectiminimax(const GameState& state, int depth, int player, Stats& stat
         return eval;
     }
 
-    double eval = chance_node(state, depth, player, stats, alpha, beta, tt);
-    tt.store(state, depth, eval);
-    return eval;
+    double total_expected_value = 0.0;
+    auto probabilities = get_dice_probabilities();
+
+    for (const auto& [roll, prob] : probabilities) {
+        auto moves = available_moves(state, roll);
+        double outcome_value;
+
+        if (moves.empty()) {
+            int next_player = (state.current_player == 1) ? 2 : 1;
+            GameState next_state(state.player_1_rocks_pos, state.player_2_rocks_pos, next_player);
+            outcome_value = expectiminimax(next_state, depth - 1, player, stats, alpha, beta, tt);
+        } else {
+            vector<pair<pair<int, int>, double>> moves_with_scores;
+            moves_with_scores.reserve(moves.size());
+            
+            for (const auto& m : moves) {
+                GameState new_state = apply_move(state, m);
+                double score = evaluate_state(new_state, player);
+                moves_with_scores.push_back({m, score});
+            }
+
+            if (state.current_player == player) {
+                sort(moves_with_scores.begin(), moves_with_scores.end(),
+                     [](const auto& a, const auto& b) { return a.second > b.second; });
+                
+                double best_value = -numeric_limits<double>::infinity();
+                double local_alpha = alpha;
+
+                for (const auto& [move, _] : moves_with_scores) {
+                    GameState new_state = apply_move(state, move);
+                    double cv = expectiminimax(new_state, depth - 1, player, stats, 
+                                               local_alpha, beta, tt);
+                    
+                    best_value = max(best_value, cv);
+                    local_alpha = max(local_alpha, cv);
+                    
+                    if (local_alpha >= beta) {
+                        stats.pruned();
+                        break;
+                    }
+                }
+                
+                outcome_value = best_value;
+            } else {
+                sort(moves_with_scores.begin(), moves_with_scores.end(),
+                     [](const auto& a, const auto& b) { return a.second < b.second; });
+                
+                double best_value = numeric_limits<double>::infinity();
+                double local_beta = beta;
+
+                for (const auto& [move, _] : moves_with_scores) {
+                    GameState new_state = apply_move(state, move);
+                    double cv = expectiminimax(new_state, depth - 1, player, stats, 
+                                               alpha, local_beta, tt);
+                    
+                    best_value = min(best_value, cv);
+                    local_beta = min(local_beta, cv);
+                    
+                    if (alpha >= local_beta) {
+                        stats.pruned();
+                        break;
+                    }
+                }
+                
+                outcome_value = best_value;
+            }
+        }
+
+        total_expected_value += prob * outcome_value;
+        
+                if (stats.nodes_visited % 100000 == 0)
+
+        cout << "Nodes: " << stats.nodes_visited 
+         << " | Pruned: " << stats.pruned_count << endl;
+    }
+
+    tt.store(state, depth, total_expected_value);
+    return total_expected_value;
 }
 
-// Main function to get best move
 tuple<pair<int, int>, int, double> get_best_move(
     const vector<int>& p1_pos,
     const vector<int>& p2_pos,
     int current_player,
     int roll,
     int depth) {
-    
+
     GameState state(p1_pos, p2_pos, current_player);
     auto moves = available_moves(state, roll);
-    
+
     if (moves.empty()) {
         return {{-1, -1}, 0, 0.0};
     }
 
     Stats stats;
     TranspositionTable tt;
-    
+
     pair<int, int> best_move = moves[0];
     double best_score = -numeric_limits<double>::infinity();
 
@@ -340,21 +346,24 @@ tuple<pair<int, int>, int, double> get_best_move(
         double score = expectiminimax(next_state, depth - 1, current_player, stats,
                                      -numeric_limits<double>::infinity(),
                                      numeric_limits<double>::infinity(), tt);
-        
+
         if (score > best_score) {
             best_score = score;
             best_move = move;
         }
     }
-
+    
+    cout << "Nodes: " << stats.nodes_visited 
+         << " | Score: " << best_score 
+         << " | Pruned: " << stats.pruned_count << endl;
+    
     return {best_move, stats.nodes_visited, best_score};
 }
 
 PYBIND11_MODULE(ai_cpp, m) {
-    m.doc() = "C++ AI Algorithm for Senet in Expectiminimax";
+    m.doc() = "C++ AI with CORRECT Expectiminimax";
     
-    m.def("get_best_move", &get_best_move, 
-          "Get the best move using expectiminimax algorithm",
+    m.def("get_best_move", &get_best_move,
           py::arg("p1_pos"),
           py::arg("p2_pos"),
           py::arg("current_player"),

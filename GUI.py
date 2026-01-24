@@ -2,7 +2,7 @@ import pygame
 import sys
 from state import GameState, board, REBIRTH, HAPPY, WATER, TRIPLE, DOUBLE, HORUS
 from actions import number_of_steps, available_moves, apply_move_lists, handle_rebirth
-from ai import get_best_move_expectiminimax
+from ai_wrapper import get_best_move_expectiminimax
 
 # Initialize Pygame
 pygame.init()
