@@ -164,5 +164,3 @@ dmypy.json
 
 # Android build outputs
 android/
-
-*.so

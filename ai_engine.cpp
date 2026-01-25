@@ -82,9 +82,7 @@ public:
 
 struct Stats {
     int nodes_visited = 0;
-    int pruned_count = 0;
     void visit() { nodes_visited++; }
-    void pruned() { pruned_count++; }
 };
 
 vector<pair<int, int>> available_moves(const GameState& state, int steps) {
@@ -226,8 +224,7 @@ unordered_map<int, double> get_dice_probabilities() {
     return {{1, 4.0/16}, {2, 6.0/16}, {3, 4.0/16}, {4, 1.0/16}, {5, 1.0/16}};
 }
 
-double expectiminimax(const GameState& state, int depth, int player, Stats& stats,
-                     double alpha, double beta, TranspositionTable& tt) {
+double expectiminimax(const GameState& state, int depth, int player, Stats& stats, TranspositionTable& tt) {
     stats.visit();
 
     double cached_value;
@@ -251,70 +248,34 @@ double expectiminimax(const GameState& state, int depth, int player, Stats& stat
         if (moves.empty()) {
             int next_player = (state.current_player == 1) ? 2 : 1;
             GameState next_state(state.player_1_rocks_pos, state.player_2_rocks_pos, next_player);
-            outcome_value = expectiminimax(next_state, depth - 1, player, stats, alpha, beta, tt);
+            outcome_value = expectiminimax(next_state, depth - 1, player, stats, tt);
         } else {
-            vector<pair<pair<int, int>, double>> moves_with_scores;
-            moves_with_scores.reserve(moves.size());
-            
-            for (const auto& m : moves) {
-                GameState new_state = apply_move(state, m);
-                double score = evaluate_state(new_state, player);
-                moves_with_scores.push_back({m, score});
-            }
-
             if (state.current_player == player) {
-                sort(moves_with_scores.begin(), moves_with_scores.end(),
-                     [](const auto& a, const auto& b) { return a.second > b.second; });
-                
                 double best_value = -numeric_limits<double>::infinity();
-                double local_alpha = alpha;
 
-                for (const auto& [move, _] : moves_with_scores) {
+                for (const auto& move : moves) {
                     GameState new_state = apply_move(state, move);
-                    double cv = expectiminimax(new_state, depth - 1, player, stats, 
-                                               local_alpha, beta, tt);
-                    
+                    double cv = expectiminimax(new_state, depth - 1, player, stats, tt);
                     best_value = max(best_value, cv);
-                    local_alpha = max(local_alpha, cv);
-                    
-                    if (local_alpha >= beta) {
-                        stats.pruned();
-                        break;
-                    }
                 }
-                
                 outcome_value = best_value;
             } else {
-                sort(moves_with_scores.begin(), moves_with_scores.end(),
-                     [](const auto& a, const auto& b) { return a.second < b.second; });
-                
                 double best_value = numeric_limits<double>::infinity();
-                double local_beta = beta;
 
-                for (const auto& [move, _] : moves_with_scores) {
+                for (const auto& move : moves) {
                     GameState new_state = apply_move(state, move);
-                    double cv = expectiminimax(new_state, depth - 1, player, stats, 
-                                               alpha, local_beta, tt);
-                    
+                    double cv = expectiminimax(new_state, depth - 1, player, stats, tt);
                     best_value = min(best_value, cv);
-                    local_beta = min(local_beta, cv);
-                    
-                    if (alpha >= local_beta) {
-                        stats.pruned();
-                        break;
-                    }
                 }
-                
                 outcome_value = best_value;
             }
         }
 
         total_expected_value += prob * outcome_value;
         
-                if (stats.nodes_visited % 100000 == 0)
-
-        cout << "Nodes: " << stats.nodes_visited 
-         << " | Pruned: " << stats.pruned_count << endl;
+        if (stats.nodes_visited % 1000000 == 0) {
+            cout << "Nodes searched: " << stats.nodes_visited << "..." << endl;
+        }
     }
 
     tt.store(state, depth, total_expected_value);
@@ -343,9 +304,7 @@ tuple<pair<int, int>, int, double> get_best_move(
 
     for (const auto& move : moves) {
         GameState next_state = apply_move(state, move);
-        double score = expectiminimax(next_state, depth - 1, current_player, stats,
-                                     -numeric_limits<double>::infinity(),
-                                     numeric_limits<double>::infinity(), tt);
+        double score = expectiminimax(next_state, depth - 1, current_player, stats, tt);
 
         if (score > best_score) {
             best_score = score;
@@ -354,8 +313,7 @@ tuple<pair<int, int>, int, double> get_best_move(
     }
     
     cout << "Nodes: " << stats.nodes_visited 
-         << " | Score: " << best_score 
-         << " | Pruned: " << stats.pruned_count << endl;
+         << " | Score: " << best_score << endl;
     
     return {best_move, stats.nodes_visited, best_score};
 }

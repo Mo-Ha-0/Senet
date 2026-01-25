@@ -24,6 +24,27 @@ def evaluate_state(state: GameState, player: int):
     opponent_pieces_remaining = len(o_positions)
 
     total_p = 0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
     for x in p_positions:
         total_p += x
     if player_pieces_remaining > 0:
@@ -146,9 +167,6 @@ def apply_move(state: GameState, move):
 
 @dataclass()
 class TranspositionTable:
-    # def __init__(self):
-    #     self.table = {}
-    # table: dict
     table: dict = None
 
     def __init__(self):
@@ -156,21 +174,16 @@ class TranspositionTable:
             self.table = {}
 
     def check(self, state, depth):
-        # h = hash(state)
-        state = self.table.get(hash(state))
-        if not state:
-            return None, None
-        s_depth, value, type = state
+        entry = self.table.get(hash(state))
+        if not entry:
+            return None
+        s_depth, value = entry
         if s_depth >= depth:
-            if VERBOSE:
-                print("*" * 80)
-                print(value, type)
-            return value, type
-        return None, None
+            return value
+        return None
 
-    def store(self, state, depth, value, node_type='NORMAL'):
-        # h = hash(state)
-        self.table[hash(state)] = (depth, value, node_type)
+    def store(self, state, depth, value):
+        self.table[hash(state)] = (depth, value)
 
     def clear(self):
         self.table.clear()
@@ -189,14 +202,13 @@ class debug:
     def pruned_branches(self):
         self.pruned_count += 1
 
-def expectiminimax(state: GameState, depth, player, stats, reporting, alpha, beta, tt):
-
+def expectiminimax(state: GameState, depth, player, stats, reporting, tt):
     stats.visit()
 
-    cache, _ = tt.check(state, depth)
+    cache = tt.check(state, depth)
     if cache is not None:
         if reporting:
-            print(f"TranspositionTable find match, depth={depth} value={cache:.2f}")
+            print(f"TranspositionTable hit, depth={depth} value={cache:.2f}")
         return cache
 
     if depth == 0 or state.is_terminal():
@@ -210,16 +222,11 @@ def expectiminimax(state: GameState, depth, player, stats, reporting, alpha, bet
     probabilities = get_dice_probabilities()
 
     for roll, prob in probabilities.items():
-        if VERBOSE:
-            print(f"[chance] roll={roll} prob={prob:.2f}")
-        if reporting:
-            print(f"chance roll={roll} prob={prob:.2f}")
-
         moves = available_moves(state, roll)
 
         if not moves:
             next_state = GameState(state.player_1_rocks_pos, state.player_2_rocks_pos, 3 - state.current_player)
-            outcome_value = expectiminimax(next_state, depth - 1, player, stats, reporting, alpha, beta, tt)
+            outcome_value = expectiminimax(next_state, depth - 1, player, stats, reporting, tt)
         else:
             moves_with_scores = []
             for m in moves:
@@ -228,59 +235,20 @@ def expectiminimax(state: GameState, depth, player, stats, reporting, alpha, bet
                 moves_with_scores.append((m, score))
 
             if state.current_player == player:
-                moves_with_scores.sort(key=lambda x: x[1], reverse=True)
-            else:
-                moves_with_scores.sort(key=lambda x: x[1])
-
-            if state.current_player == player:
                 best_value = float('-inf')
-                local_alpha = alpha
-
                 for move, _ in moves_with_scores:
                     new_state = apply_move(state, move)
-                    child_value = expectiminimax(new_state, depth - 1, player, stats,
-                                                  reporting, local_alpha, beta, tt)
-
+                    child_value = expectiminimax(new_state, depth - 1, player, stats, reporting, tt)
                     if child_value > best_value:
                         best_value = child_value
-
-                    if child_value > local_alpha:
-                        local_alpha = child_value
-
-                    if reporting:
-                        print(f"  MAX {move} -> {child_value:.2f}")
-
-                    if local_alpha >= beta:
-                        stats.pruned_branches()
-                        if reporting:
-                            print(f"  MAX prune: alpha({local_alpha:.2f}) >= beta({beta:.2f})")
-                        break
-
                 outcome_value = best_value
             else:
                 best_value = float('inf')
-                local_beta = beta
-
                 for move, _ in moves_with_scores:
                     new_state = apply_move(state, move)
-                    child_value = expectiminimax(new_state, depth - 1, player, stats,
-                                                  reporting, alpha, local_beta, tt)
-
+                    child_value = expectiminimax(new_state, depth - 1, player, stats, reporting, tt)
                     if child_value < best_value:
                         best_value = child_value
-
-                    if child_value < local_beta:
-                        local_beta = child_value
-
-                    if reporting:
-                        print(f"  MIN {move} -> {child_value:.2f}")
-
-                    if alpha >= local_beta:
-                        stats.pruned_branches()
-                        if reporting:
-                            print(f"  MIN prune: alpha({alpha:.2f}) >= beta({local_beta:.2f})")
-                        break
-
                 outcome_value = best_value
 
         total_expected_value += prob * outcome_value
@@ -312,7 +280,7 @@ def get_best_move_expectiminimax(state: GameState, roll, depth, reporting):
 
     for move in moves:
         next_st = apply_move(state, move)
-        score = expectiminimax(next_st, depth - 1, current_player, deb, reporting, float('-inf'), float('inf'), tt)
+        score = expectiminimax(next_st, depth - 1, current_player, deb, reporting, tt)
         evaluatons.append((move, score))
         if reporting:
             print(f"[best] move={move} score={score:.2f}")
